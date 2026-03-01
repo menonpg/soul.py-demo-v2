@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>soul.py v2.0 — RAG + RLM Demo</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0a0a0a;color:#e0e0e0;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+  header{padding:12px 20px;border-bottom:1px solid #1e1e1e;display:flex;align-items:center;gap:10px;flex-shrink:0}
+  .logo{font-size:1.2rem;font-weight:700;color:#fff}.logo span{color:#7c6af7}
+  .v2badge{background:#1a2a1a;color:#4caf50;font-size:0.7rem;padding:2px 8px;border-radius:10px;font-weight:600;border:1px solid #2a4a2a}
+  .tagline{font-size:0.78rem;color:#444;margin-left:4px}
+  .links{margin-left:auto;display:flex;gap:14px}
+  .links a{color:#7c6af7;text-decoration:none;font-size:0.78rem}
+  .links a:hover{text-decoration:underline}
+
+  /* Mode bar */
+  .modebar{padding:8px 16px;background:#0f0f0f;border-bottom:1px solid #1a1a1a;display:flex;align-items:center;gap:8px;flex-shrink:0}
+  .modebar label{font-size:0.75rem;color:#555;margin-right:4px}
+  .mode-btn{background:#111;border:1px solid #2a2a2a;color:#666;padding:5px 14px;border-radius:20px;cursor:pointer;font-size:0.75rem;transition:all 0.15s}
+  .mode-btn:hover{border-color:#555;color:#aaa}
+  .mode-btn.active{border-color:#7c6af7;color:#7c6af7;background:#1a1530}
+  .mode-btn.active.rag{border-color:#2196f3;color:#2196f3;background:#0a1525}
+  .mode-btn.active.rlm{border-color:#ff9800;color:#ff9800;background:#1a1000}
+  .session-badge{margin-left:auto;background:#1e1e1e;color:#555;font-size:0.72rem;padding:3px 10px;border-radius:12px}
+  .new-sess-btn{background:none;border:1px solid #222;color:#444;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.72rem}
+  .new-sess-btn:hover{border-color:#555;color:#888}
+
+  /* Main layout */
+  .main{display:flex;flex:1;overflow:hidden;min-height:0}
+
+  /* Chat panel */
+  .chat{flex:1;display:flex;flex-direction:column;border-right:1px solid #1a1a1a;min-width:0}
+  .chat-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
+  .msg{max-width:85%;line-height:1.5}
+  .msg.user{align-self:flex-end;background:#7c6af7;color:#fff;padding:9px 13px;border-radius:16px 16px 3px 16px;font-size:0.85rem}
+  .msg.assistant{align-self:flex-start;background:#161616;padding:9px 13px;border-radius:16px 16px 16px 3px;font-size:0.85rem;border:1px solid #242424}
+  .msg.assistant p{margin-bottom:5px}.msg.assistant p:last-child{margin-bottom:0}
+  .msg.assistant ul,.msg.assistant ol{margin:3px 0 3px 14px}
+  .msg.assistant code{background:#222;padding:1px 4px;border-radius:3px;font-size:0.82em}
+  .msg.assistant pre{background:#222;padding:8px;border-radius:5px;overflow-x:auto;margin:5px 0}
+  .msg.assistant strong{color:#fff}
+  .msg.system{align-self:center;color:#555;font-size:0.72rem;font-style:italic;background:#111;padding:5px 12px;border-radius:16px;border:1px solid #1e1e1e}
+  .msg.divider{color:#7c6af7;border-color:#2a2050;background:#110f20}
+  .chat-input{padding:12px 14px;border-top:1px solid #1a1a1a;display:flex;gap:8px;flex-shrink:0}
+  .chat-input input{flex:1;background:#141414;border:1px solid #242424;color:#e0e0e0;padding:9px 13px;border-radius:8px;font-size:0.85rem;outline:none}
+  .chat-input input:focus{border-color:#7c6af7}
+  .chat-input button{background:#7c6af7;color:#fff;border:none;padding:9px 16px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600}
+  .chat-input button:disabled{background:#222;cursor:not-allowed}
+
+  /* Right panels */
+  .right{width:580px;display:flex;flex-direction:column;min-width:0}
+
+  /* Router panel */
+  .router-panel{border-bottom:1px solid #1a1a1a;flex-shrink:0}
+  .panel-header{padding:10px 16px;display:flex;align-items:center;justify-content:space-between}
+  .panel-header h3{font-size:0.72rem;color:#444;text-transform:uppercase;letter-spacing:0.06em}
+  .panel-meta{font-size:0.68rem;color:#333}
+
+  .route-display{padding:10px 16px 12px;display:flex;gap:12px;align-items:flex-start}
+  .route-box{flex:1;background:#111;border:1px solid #1e1e1e;border-radius:8px;padding:10px 12px}
+  .route-label{font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;color:#444;margin-bottom:4px}
+  .route-value{font-size:0.88rem;font-weight:700;color:#666}
+  .route-value.rag{color:#2196f3}
+  .route-value.rlm{color:#ff9800}
+  .route-value.auto{color:#7c6af7}
+  .latency-row{display:flex;gap:8px;margin-top:8px}
+  .lat-chip{background:#0f0f0f;border:1px solid #1a1a1a;border-radius:4px;padding:3px 8px;font-size:0.68rem;color:#444}
+  .lat-chip span{color:#666}
+
+  .rlm-steps{padding:0 16px 10px;font-size:0.72rem;color:#555}
+  .rlm-steps .step{background:#0f0f0f;border:1px solid #1a1a1a;border-radius:5px;padding:6px 9px;margin-bottom:4px}
+
+  /* Context panel */
+  .context-panel{flex:1;display:flex;flex-direction:column;min-height:0}
+  .context-tabs{display:flex;border-bottom:1px solid #1a1a1a;flex-shrink:0}
+  .ctx-tab{padding:7px 14px;font-size:0.72rem;color:#444;cursor:pointer;border-bottom:2px solid transparent}
+  .ctx-tab.active{color:#7c6af7;border-bottom-color:#7c6af7}
+  .ctx-tab:hover{color:#888}
+  .ctx-content{flex:1;overflow-y:auto;padding:12px 16px;font-family:'SF Mono','Fira Code',monospace;font-size:0.68rem;line-height:1.7;color:#555;white-space:pre-wrap;word-break:break-word}
+
+  .reset-btn{margin:8px 16px;background:none;border:1px solid #1a1a1a;color:#333;padding:6px;border-radius:5px;cursor:pointer;font-size:0.72rem;flex-shrink:0}
+  .reset-btn:hover{border-color:#333;color:#555}
+
+  /* Typing */
+  .typing{display:flex;gap:3px;align-items:center;padding:9px 13px;background:#161616;border-radius:16px;border:1px solid #242424;align-self:flex-start}
+  .typing span{width:5px;height:5px;background:#444;border-radius:50%;animation:bounce 1.2s infinite}
+  .typing span:nth-child(2){animation-delay:.2s}.typing span:nth-child(3){animation-delay:.4s}
+  @keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-4px)}}
+
+  /* Intro */
+  .intro{text-align:center;margin:auto;color:#333;max-width:360px;padding:20px}
+  .intro h2{font-size:0.95rem;color:#555;margin-bottom:8px}
+  .intro p{font-size:0.78rem;line-height:1.6;margin-bottom:12px}
+  .intro-steps{text-align:left;background:#0f0f0f;border:1px solid #181818;border-radius:8px;padding:12px 14px;margin-bottom:12px}
+  .intro-steps .s{font-size:0.75rem;color:#444;padding:3px 0}
+  .intro-steps .s b{color:#7c6af7}
+  .examples{display:flex;flex-direction:column;gap:5px}
+  .ex{background:#0f0f0f;border:1px solid #181818;padding:7px 11px;border-radius:7px;font-size:0.75rem;color:#444;cursor:pointer;text-align:left}
+  .ex:hover{border-color:#7c6af7;color:#888}
+  .ex .tag{font-size:0.62rem;padding:1px 5px;border-radius:3px;margin-left:6px;vertical-align:middle}
+  .ex .tag.rag{background:#0a1525;color:#2196f3;border:1px solid #1a3a5a}
+  .ex .tag.rlm{background:#1a1000;color:#ff9800;border:1px solid #3a2000}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">soul<span>.py</span></div>
+  <div class="v2badge">v2.0</div>
+  <div class="tagline">RAG + RLM hybrid — automatic query routing</div>
+  <div class="links">
+    <a href="https://soul.themenonlab.com" target="_blank">v0.1 demo</a>
+    <a href="https://github.com/menonpg/soul.py/tree/v2.0-rag-rlm" target="_blank">★ Branch</a>
+    <a href="https://blog.themenonlab.com/blog/rag-plus-rlm-complete-knowledge-base-architecture" target="_blank">Architecture</a>
+  </div>
+</header>
+
+<div class="modebar">
+  <label>Retrieval mode:</label>
+  <button class="mode-btn active" id="btn-auto" onclick="setMode('auto',this)">⚡ Auto (router decides)</button>
+  <button class="mode-btn rag" id="btn-rag"  onclick="setMode('rag',this)">🔍 RAG only</button>
+  <button class="mode-btn rlm" id="btn-rlm"  onclick="setMode('rlm',this)">🔄 RLM only</button>
+  <div class="session-badge" id="session-badge">Session 1</div>
+  <button class="new-sess-btn" id="new-sess-btn" onclick="newSession()" disabled>↻ New Session</button>
+</div>
+
+<div class="main">
+  <!-- Chat -->
+  <div class="chat">
+    <div class="chat-messages" id="messages">
+      <div class="intro">
+        <h2>Query routing in action</h2>
+        <p>Auto mode uses a lightweight LLM classifier to route each query. Watch the Router panel to see why.</p>
+        <div class="intro-steps">
+          <div class="s"><b>Step 1</b> — Tell the agent several things about yourself</div>
+          <div class="s"><b>Step 2</b> — Ask a specific question → routes to RAG</div>
+          <div class="s"><b>Step 3</b> — Ask for a summary/pattern → routes to RLM</div>
+          <div class="s"><b>Step 4</b> — Try forcing RAG/RLM mode to compare</div>
+        </div>
+        <div class="examples">
+          <button class="ex" onclick="sendEx(this)">My name is Prahlad and I run an AI research lab in Pittsburgh. <span class="tag rag">→ RAG</span></button>
+          <button class="ex" onclick="sendEx(this)">I fly Cessnas out of KBTP and own an Audi R8 in Florida. <span class="tag rag">→ RAG</span></button>
+          <button class="ex" onclick="sendEx(this)">What car do I own? <span class="tag rag">→ RAG</span></button>
+          <button class="ex" onclick="sendEx(this)">Summarize everything you know about me across all our conversations. <span class="tag rlm">→ RLM</span></button>
+          <button class="ex" onclick="sendEx(this)">What patterns appear in the things I've told you? <span class="tag rlm">→ RLM</span></button>
+        </div>
+      </div>
+    </div>
+    <div class="chat-input">
+      <input type="text" id="input" placeholder="Ask something..." onkeydown="if(event.key==='Enter')send()" />
+      <button id="send-btn" onclick="send()">Send</button>
+    </div>
+  </div>
+
+  <!-- Right panels -->
+  <div class="right">
+    <!-- Router decision -->
+    <div class="router-panel">
+      <div class="panel-header">
+        <h3>⚡ Router Decision</h3>
+        <span class="panel-meta" id="router-meta">waiting for query...</span>
+      </div>
+      <div class="route-display">
+        <div class="route-box">
+          <div class="route-label">Query classified as</div>
+          <div class="route-value" id="route-label">—</div>
+          <div class="latency-row">
+            <div class="lat-chip">Router <span id="lat-router">—</span></div>
+            <div class="lat-chip">Retrieval <span id="lat-retrieval">—</span></div>
+            <div class="lat-chip">Total <span id="lat-total">—</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="rlm-steps" id="rlm-steps" style="display:none">
+        <div style="font-size:0.68rem;color:#444;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.06em">RLM sub-summaries</div>
+        <div id="rlm-summaries"></div>
+      </div>
+    </div>
+
+    <!-- Context tabs -->
+    <div class="context-panel">
+      <div class="context-tabs">
+        <div class="ctx-tab active" onclick="showTab('retrieved',this)">Retrieved Context</div>
+        <div class="ctx-tab" onclick="showTab('memory',this)">Full MEMORY.md</div>
+      </div>
+      <div class="ctx-content" id="tab-retrieved">Ask something to see what was retrieved...</div>
+      <div class="ctx-content" id="tab-memory" style="display:none"># MEMORY.md
+(No memories yet)</div>
+    </div>
+
+    <button class="reset-btn" onclick="resetAll()">↺ Reset everything</button>
+  </div>
+</div>
+
+<script>
+let mode = 'auto';
+let introCleared = false;
+let msgCount = 0;
+
+function setMode(m, btn) {
+  mode = m;
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function showTab(tab, el) {
+  document.querySelectorAll('.ctx-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-retrieved').style.display = tab === 'retrieved' ? 'block' : 'none';
+  document.getElementById('tab-memory').style.display    = tab === 'memory'    ? 'block' : 'none';
+}
+
+function clearIntro() {
+  if (!introCleared) {
+    document.getElementById('messages').innerHTML = '';
+    introCleared = true;
+  }
+}
+
+function appendMsg(role, text, cls) {
+  clearIntro();
+  const div = document.createElement('div');
+  div.className = `msg ${role}${cls?' '+cls:''}`;
+  if (role === 'assistant') div.innerHTML = marked.parse(text);
+  else div.textContent = text;
+  const c = document.getElementById('messages');
+  c.appendChild(div); c.scrollTop = c.scrollHeight;
+}
+
+function showTyping() {
+  clearIntro();
+  const div = document.createElement('div');
+  div.className = 'typing'; div.id = 'typing';
+  div.innerHTML = '<span></span><span></span><span></span>';
+  const c = document.getElementById('messages');
+  c.appendChild(div); c.scrollTop = c.scrollHeight;
+}
+function hideTyping() { const t=document.getElementById('typing'); if(t)t.remove(); }
+
+function updateRouter(data) {
+  const route = data.route;
+  const label = document.getElementById('route-label');
+  label.textContent = route === 'RAG'
+    ? '🔍 FOCUSED → RAG'
+    : '🔄 EXHAUSTIVE → RLM';
+  label.className = 'route-value ' + (route==='RAG'?'rag':'rlm');
+
+  document.getElementById('lat-router').textContent    = data.router_ms ? data.router_ms+'ms' : 'forced';
+  document.getElementById('lat-retrieval').textContent = data.retrieval_ms+'ms';
+  document.getElementById('lat-total').textContent     = data.total_ms+'ms';
+  document.getElementById('router-meta').textContent   = `mode: ${mode}`;
+
+  // RAG context
+  if (data.rag_context) {
+    document.getElementById('tab-retrieved').textContent = data.rag_context;
+  }
+
+  // RLM sub-summaries
+  const rlmSteps = document.getElementById('rlm-steps');
+  if (data.rlm_meta) {
+    rlmSteps.style.display = 'block';
+    const m = data.rlm_meta;
+    document.getElementById('rlm-summaries').innerHTML =
+      `<div class="step">${m.chunks_processed} chunks processed · ${m.relevant_chunks} relevant</div>` +
+      (m.sub_summaries||[]).map(s =>
+        `<div class="step">${s.substring(0,120)}${s.length>120?'...':''}</div>`
+      ).join('');
+    document.getElementById('tab-retrieved').textContent =
+      m.sub_summaries.join('\n\n===\n\n') || '(no relevant chunks)';
+  } else {
+    rlmSteps.style.display = 'none';
+  }
+
+  // Full memory
+  document.getElementById('tab-memory').textContent = data.memory || '';
+  document.getElementById('new-sess-btn').disabled = data.message_count === 0;
+  document.getElementById('session-badge').textContent = `Session ${data.session_count}`;
+}
+
+async function send(text) {
+  const input = document.getElementById('input');
+  const q = text || input.value.trim();
+  if (!q) return;
+  input.value = '';
+  document.getElementById('send-btn').disabled = true;
+  appendMsg('user', q);
+  showTyping();
+
+  try {
+    const res = await fetch('/ask', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({question: q, mode}),
+      credentials: 'include',
+    });
+    const data = await res.json();
+    hideTyping();
+    if (data.error) { appendMsg('system', 'Error: '+data.error); return; }
+    appendMsg('assistant', data.answer);
+    updateRouter(data);
+    msgCount = data.message_count;
+  } catch(e) {
+    hideTyping();
+    appendMsg('system', 'Something went wrong.');
+  }
+  document.getElementById('send-btn').disabled = false;
+  document.getElementById('input').focus();
+}
+
+function sendEx(btn) {
+  // strip the tag span text
+  const q = btn.childNodes[0].textContent.trim();
+  send(q);
+}
+
+async function newSession() {
+  const res = await fetch('/new-session', {method:'POST', credentials:'include'});
+  const data = await res.json();
+  if (!data.ok) return;
+  document.getElementById('session-badge').textContent = `Session ${data.session_count}`;
+  appendMsg('system', `↻ New session — history cleared, memory intact (${data.total_memories} entries). Ask what I remember.`, 'divider');
+  document.getElementById('input').value = 'What do you know about me?';
+  document.getElementById('input').focus();
+  document.getElementById('new-sess-btn').disabled = false;
+}
+
+async function resetAll() {
+  await fetch('/reset', {method:'POST', credentials:'include'});
+  location.reload();
+}
+</script>
+</body>
+</html>
