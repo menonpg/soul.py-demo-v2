@@ -18,6 +18,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 
 sessions: dict = {}
 SESSION_TTL = 1800
+MESSAGE_LIMIT = int(os.environ.get("MESSAGE_LIMIT", "10"))  # max queries per session, configurable via Railway env var
 
 def make_agent(mem_path: str, soul_path: str) -> HybridAgent:
     return HybridAgent(
@@ -83,6 +84,14 @@ async def ask(request: Request, session_id: str = Cookie(default=None)):
         agent = session["agent"]
         agent.mode = force_mode  # override mode per request
         agent._history = session["history"]  # restore history
+
+        # Rate limit check
+        if session["message_count"] >= MESSAGE_LIMIT:
+            return JSONResponse({
+                "error": f"Session limit reached ({MESSAGE_LIMIT} messages). This is a demo — refresh to start a new session, or visit soul.themenonlab.com to learn more.",
+                "limit_reached": True,
+                "message_count": session["message_count"],
+            }, status_code=429)
 
         result = agent.ask(question, remember=True)
 

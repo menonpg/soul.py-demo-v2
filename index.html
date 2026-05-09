@@ -300,6 +300,12 @@ async function send(text) {
     });
     const data = await res.json();
     hideTyping();
+    if (data.limit_reached) {
+      appendMsg('system', `🛑 Demo limit reached (${data.message_count} messages). Refresh the page to start a new session. Visit <a href="https://soul.themenonlab.com" target="_blank">soul.themenonlab.com</a> to learn more.`);
+      document.getElementById('send-btn').disabled = true;
+      document.getElementById('input').disabled = true;
+      return;
+    }
     if (data.error) { appendMsg('system', 'Error: '+data.error); return; }
     appendMsg('assistant', data.answer);
     updateRouter(data);
